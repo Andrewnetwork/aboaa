@@ -25,10 +25,10 @@ opCreator domain range = \x y -> fromJust $ lookup (x,y) (zip domain range)
 -- 'b' 
 
 createAllOps :: (Eq a) => [a] -> [a -> a -> a] 
-createAllOps ls = do
-    let domain = cartesianProd ls ls
+createAllOps set = do
+    let domain = cartesianProd set set
     let domainLength = length domain
-    range <- permRepeat ls domainLength
+    range <- permRepeat set domainLength
     return $ opCreator domain range
 -- >>> length $ createAllOps "ab"
 -- 16
@@ -39,16 +39,16 @@ createAllOps ls = do
 -- Remark: length (createAllOps ls) = (length ls)^(length ls)^2
 
 nOp :: (Eq a) => [a] -> Int -> [((a,a),a)]
-nOp ls n = (\(x,y)-> ((x,y),fn x y)) <$> cartesianProd ls ls
-           where fn = createAllOps ls !! n
+nOp set n = (\(x,y)-> ((x,y),fn x y)) <$> cartesianProd set set
+            where fn = createAllOps set !! n
 -- >>> nOp "ab" 5 
 -- [(('a','a'),'a'),(('a','b'),'b'),(('b','a'),'a'),(('b','b'),'b')]
 
 ------  Checking operators for algebraic properties. (pg 21) ---------
 -- Commutative 
 isCommutative :: (Eq a) => [a] -> (a -> a -> a) -> Bool 
-isCommutative ls fn = (uncurry fn <$> domain) == (uncurry (flip fn) <$> domain)
-                      where domain = cartesianProd ls ls 
+isCommutative set operator = (uncurry operator <$> domain) == (uncurry (flip operator) <$> domain)
+                             where domain = cartesianProd set set 
 -- >>> nOp "ab" 0
 -- [(('a','a'),'a'),(('a','b'),'a'),(('b','a'),'a'),(('b','b'),'a')]
 -- >>> isCommutative "ab" (createAllOps "ab" !! 0)
@@ -65,8 +65,8 @@ isCommutative ls fn = (uncurry fn <$> domain) == (uncurry (flip fn) <$> domain)
 
 -- Associative 
 isAssociative :: (Eq (f a), Applicative f) => f a -> (a -> a -> a) -> Bool
-isAssociative ls fn = (fn <$> ls <*> (uncurry fn <$> domain)) == (fn <$> (uncurry fn <$> domain) <*> ls) 
-                      where domain = cartesianProd ls ls 
+isAssociative set operator = (operator <$> set <*> (uncurry operator <$> domain)) == (operator <$> (uncurry operator <$> domain) <*> set) 
+                             where domain = cartesianProd set set 
 -- >>> isAssociative "ab" (createAllOps "ab" !! 0)
 -- True 
 
@@ -77,13 +77,13 @@ isAssociative ls fn = (fn <$> ls <*> (uncurry fn <$> domain)) == (fn <$> (uncurr
 --         this observation does doesn't hold for all sets, i.e., like on "abc."
 
 identityElement :: (Eq a) => [a] -> (a -> a -> a) -> Maybe a
-identityElement ls fn | null identityLs = Nothing
-                      | otherwise       = Just $ head identityLs 
-                      where identityLs = [e | e <- ls, (fn e <$> ls) == ls && (fn <$> ls <*> pure e) == ls]
-
-hasIdentityElement ls fn = case identityElement ls fn of 
-                            Just _ -> True 
-                            _ -> False 
+identityElement set operator 
+    | null identityLs = Nothing
+    | otherwise       = Just $ head identityLs 
+    where identityLs = [e | e <- set, (operator e <$> set) == set && (operator <$> set <*> pure e) == set]
+                      
+hasIdentityElement :: Eq a => [a] -> (a -> a -> a) -> Bool
+hasIdentityElement set operator = isJust $ identityElement set operator 
 -- >>> nOp "ab" 0
 -- [(('a','a'),'a'),(('a','b'),'a'),(('b','a'),'a'),(('b','b'),'a')]
 -- >>> identityElement "ab" (createAllOps "ab" !! 0)
@@ -93,27 +93,33 @@ hasIdentityElement ls fn = case identityElement ls fn of
 -- >>> identityElement "ab" (createAllOps "ab" !! 7)
 -- Just 'a' 
 --
--- Proof of the necessity of a singular identity: 
+-- Proof of a singular identity: 
 --     It is inconceivable for an operation to have two identity elements, as e1 * e2 
---     would need to be equal to e1 and e2, by definition, if they are both identities. 
+--     would need to be equal to e1 and e2, by definition, if they are both identities. Thus 
+--     if e1 and e2 where both identities, e1 = e2, and since sets contain no duplicates, there
+--     can be only one identity element.   
+--     
+--     Note: Since we are using lists instead of sets here, we can create operators which have 
+--           two identities or more because we can have duplicate elements, but that would be 
+--           an abuse of how we intend to use the list as a set.   
 --         
 
 elmInv :: Eq a => (p -> p -> a) -> [p] -> a -> p -> Maybe p
-elmInv fn ls e x | null elmInvLs = Nothing
-                 | otherwise     = Just $ head elmInvLs
-                 where elmInvLs = [ y | y <- ls, fn x y == e && fn y x == e]
+elmInv operator set e x | null elmInvLs = Nothing
+                        | otherwise     = Just $ head elmInvLs
+                        where elmInvLs = [ y | y <- set, operator x y == e && operator y x == e]
 -- >>> elmInv (createAllOps "ab" !! 7) "ab" 'a' 'a' 
 -- Just 'a'
 
-inverseFunction ls fn = identityElement ls fn >>= go
-                        where go e = let invs = mapMaybe (elmInv fn ls e) ls
-                                     in if length invs == length ls 
-                                        then Just $ \x -> lookup x (zip ls invs)
-                                        else Nothing
+inverseFunction :: Eq a => [a] -> (a -> a -> a) -> Maybe (a -> Maybe a)
+inverseFunction set operator = identityElement set operator >>= go
+                               where go e = let invs = mapMaybe (elmInv operator set e) set
+                                            in if length invs == length set 
+                                               then Just $ \x -> lookup x (zip set invs)
+                                               else Nothing
 
-allElementsHaveInv set operator = case inverseFunction set operator of 
-                                    Just _ -> True 
-                                    _ -> False 
+allElementsHaveInv :: Eq a => [a] -> (a -> a -> a) -> Bool
+allElementsHaveInv set operator = isJust $ inverseFunction set operator 
 -- >>> allElementsHaveInv "ab" <$> createAllOps "ab"
 -- [False,False,False,False,False,False,True,False,False,True,False,False,False,False,False,False]
 -- >>> nOp "ab" 6
