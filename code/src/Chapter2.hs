@@ -21,13 +21,14 @@ createAllOps ls = do
     let domain = cartesianProd ls ls
     let domainLength = length domain
     range <- permRepeat ls domainLength
-    return (opCreator domain range)
+    return $ opCreator domain range
 -- >>> length $ createAllOps "ab"
 -- 16
 -- >>> (\(x,y) -> (createAllOps "ab" !! 0) x y) <$> [('a','a'),('a','b'),('b','a'),('b','b')]
 -- "aaaa"
 -- >>> (\(x,y) -> (createAllOps "ab" !! 5) x y) <$> [('a','a'),('a','b'),('b','a'),('b','b')]
 -- "abab"
+-- Remark: length (createAllOps ls) = (length ls)^(length ls)^2
 
 nOp :: (Eq a) => [a] -> Int -> [((a,a),a)]
 nOp ls n = (\(x,y)-> ((x,y),fn x y)) <$> cartesianProd ls ls
@@ -55,6 +56,7 @@ isCommutative ls fn = (uncurry fn <$> domain) == (uncurry (flip fn) <$> domain)
 -- Observation: Half of the operators defined on "ab" are commutative. (there are 16 in total)
 
 -- Associative 
+isAssociative :: (Eq (f a), Applicative f) => f a -> (a -> a -> a) -> Bool
 isAssociative ls fn = (fn <$> ls <*> (uncurry fn <$> domain)) == (fn <$> (uncurry fn <$> domain) <*> ls) 
                       where domain = cartesianProd ls ls 
 -- >>> isAssociative "ab" (createAllOps "ab" !! 0)
@@ -66,5 +68,9 @@ isAssociative ls fn = (fn <$> ls <*> (uncurry fn <$> domain)) == (fn <$> (uncurr
 -- Observation: Half of the operators defined on "ab" are associative. 
 -- this observation does doesn't hold for all sets, i.e., like on "abc."
 
--- TODO: Make a function to find the identity element for an operator. 
+identityElement ls fn = [e | e <- ls, (fn e <$> ls) == ls && (fn <$> ls <*> pure e) == ls]
+-- >>> nOp "ab" 0
+-- [(('a','a'),'a'),(('a','b'),'a'),(('b','a'),'a'),(('b','b'),'a')]
+-- >>> identityElement "ab" (createAllOps "ab" !! 2)
+
 -- TODO: Make a function which returns the inverse function for an operator. 
