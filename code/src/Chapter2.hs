@@ -10,7 +10,7 @@ import Data.Maybe
 ------  Generating all operations. (pg 20) ---------
 cartesianProd :: Applicative f => f a -> f b -> f (a, b)
 cartesianProd a b = (,) <$> a <*> b 
--- >>> cartesianProd "ab" "ab"
+-- >>> cartesianProd "ab" "ab" 
 -- [('a','a'),('a','b'),('b','a'),('b','b')]
 
 permRepeat :: (Monad m, Num b, Enum b) => m a -> b -> m [a]
@@ -32,9 +32,9 @@ createAllOps set = do
     return $ opCreator domain range
 -- >>> length $ createAllOps "ab"
 -- 16
--- >>> (\(x,y) -> (createAllOps "ab" !! 0) x y) <$> [('a','a'),('a','b'),('b','a'),('b','b')]
+-- >>> uncurry (createAllOps "ab" !! 0) <$> [('a','a'),('a','b'),('b','a'),('b','b')]
 -- "aaaa"
--- >>> (\(x,y) -> (createAllOps "ab" !! 5) x y) <$> [('a','a'),('a','b'),('b','a'),('b','b')]
+-- >>> uncurry (createAllOps "ab" !! 5) <$> [('a','a'),('a','b'),('b','a'),('b','b')]
 -- "abab"
 -- Remark: length (createAllOps ls) = (length ls)^(length ls)^2
 
@@ -65,8 +65,9 @@ isCommutative set operator = (uncurry operator <$> domain) == (uncurry (flip ope
 
 -- Associative 
 isAssociative :: (Eq (f a), Applicative f) => f a -> (a -> a -> a) -> Bool
-isAssociative set operator = (operator <$> set <*> (uncurry operator <$> domain)) == (operator <$> (uncurry operator <$> domain) <*> set) 
-                             where domain = cartesianProd set set 
+isAssociative set operator = 
+    (operator <$> set <*> (uncurry operator <$> domain)) == (operator <$> (uncurry operator <$> domain) <*> set) 
+    where domain = cartesianProd set set 
 -- >>> isAssociative "ab" (createAllOps "ab" !! 0)
 -- True 
 
